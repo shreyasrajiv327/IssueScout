@@ -1,0 +1,7 @@
+{
+  "repositories": [
+    "cilium/cilium"
+  ],
+  "min_score": 70,
+  "lookback_hours": 3
+}

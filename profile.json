@@ -1,0 +1,65 @@
+{
+  "name": "Shreyas",
+  "github_username": "shreyasrajiv327",
+
+  "skills": [
+    "Go",
+    "Python",
+    "Java",
+    "Kubernetes",
+    "Cilium",
+    "Hubble",
+    "eBPF",
+    "Linux",
+    "Networking",
+    "Network Security",
+    "GitHub"
+  ],
+
+  "areas_of_interest": [
+    "Networking",
+    "Network Security",
+    "Cloud Networking",
+    "Kubernetes Networking",
+    "eBPF",
+    "Cilium",
+    "Hubble",
+    "Gateway API"
+  ],
+
+  "learning_goals": [
+    "Become stronger at networking internals",
+    "Build deeper networking security expertise",
+    "Become a stronger Cilium contributor",
+    "Understand Kubernetes networking internals"
+  ],
+
+  "previous_contributions": [
+    {
+      "title": "Hubble L7 access-log filtering",
+      "issue_numbers": [
+        46214
+      ],
+      "description": "Worked on Hubble monitor filtering for MessageTypeAccessLog events, including AgentEvent vs PerfEvent handling and tests.",
+      "skills": [
+        "Go",
+        "Hubble",
+        "Cilium",
+        "Filtering",
+        "Testing"
+      ]
+    },
+    {
+      "title": "Gateway API investigation",
+      "issue_numbers": [],
+      "description": "Investigated Gateway API and ExternalAuth behavior and worked through Cilium operator model ingestion and related tests.",
+      "skills": [
+        "Go",
+        "Kubernetes",
+        "Gateway API",
+        "Cilium",
+        "Operator"
+      ]
+    }
+  ]
+}
