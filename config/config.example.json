@@ -3,5 +3,11 @@
     "cilium/cilium"
   ],
   "min_score": 70,
-  "lookback_hours": 3
+  "lookback_hours": 3,
+
+  "llm": {
+    "provider": "ollama",
+    "model": "qwen3:4b",
+    "base_url": "http://localhost:11434/v1"
+  }
 }
