@@ -5,35 +5,68 @@ from github import GitHubClient
 from analyzer import IssueAnalyzer
 
 
-def is_relevant(issue, profile):
+MAX_LLM_ISSUES = 10
+
+
+def calculate_relevance(issue, profile):
     """
-    Cheap pre-filter to avoid sending obviously
-    irrelevant issues to the LLM.
+    Calculate a cheap relevance score before using the LLM.
+
+    Title matches are weighted more heavily than
+    description matches because titles are usually
+    more representative of the actual issue.
     """
 
-    text = (
-        issue.get("title", "") + " " +
-        issue.get("body", "")
-    ).lower()
+    title = issue.get("title", "").lower()
+    body = (issue.get("body") or "").lower()
 
-    # Include labels because they often contain useful
-    # technical/category information.
     labels = " ".join(
         label.get("name", "")
         for label in issue.get("labels", [])
     ).lower()
 
-    text = text + " " + labels
+    skills = profile.get("skills", [])
+    interests = profile.get("areas_of_interest", [])
 
-    keywords = (
-        profile.get("skills", []) +
-        profile.get("areas_of_interest", [])
-    )
+    score = 0
+    matched_keywords = []
 
-    return any(
-        keyword.lower() in text
-        for keyword in keywords
-    )
+    # Skills
+    for skill in skills:
+        keyword = skill.lower()
+
+        if keyword in title:
+            score += 5
+            matched_keywords.append(skill)
+
+        elif keyword in labels:
+            score += 4
+            matched_keywords.append(skill)
+
+        elif keyword in body:
+            score += 1
+            matched_keywords.append(skill)
+
+    # Areas of interest
+    for interest in interests:
+        keyword = interest.lower()
+
+        if keyword in title:
+            score += 5
+            matched_keywords.append(interest)
+
+        elif keyword in labels:
+            score += 4
+            matched_keywords.append(interest)
+
+        elif keyword in body:
+            score += 1
+            matched_keywords.append(interest)
+
+    return {
+        "score": score,
+        "matched_keywords": list(set(matched_keywords))
+    }
 
 
 def main():
@@ -63,8 +96,8 @@ def main():
     # -------------------------
 
     # Temporary for testing.
-    # Later we will replace this with
-    # persistent state tracking.
+    # Later this will be replaced
+    # with persistent state tracking.
 
     since = (
         datetime.now(timezone.utc)
@@ -114,23 +147,58 @@ def main():
         )
 
         # -------------------------
-        # Cheap relevance filter
+        # Calculate relevance
         # -------------------------
 
-        relevant_issues = [
-            issue
-            for issue in issues
-            if is_relevant(issue, profile)
+        ranked_issues = []
+
+        for issue in issues:
+
+            relevance = calculate_relevance(
+                issue,
+                profile
+            )
+
+            ranked_issues.append({
+                "issue": issue,
+                "relevance_score": relevance["score"],
+                "matched_keywords": relevance[
+                    "matched_keywords"
+                ]
+            })
+
+        # Highest relevance first
+        ranked_issues.sort(
+            key=lambda item: item["relevance_score"],
+            reverse=True
+        )
+
+        # -------------------------
+        # Select candidates
+        # -------------------------
+
+        candidates = [
+            item
+            for item in ranked_issues
+            if item["relevance_score"] > 0
         ]
 
         print(
-            f"Relevant issues after filtering: "
-            f"{len(relevant_issues)}"
+            f"Relevant issues: {len(candidates)}"
         )
 
-        if not relevant_issues:
+        if not candidates:
             print("No relevant issues found.")
             continue
+
+        # Only send the best candidates
+        # to the expensive LLM.
+        candidates = candidates[:MAX_LLM_ISSUES]
+
+        print(
+            f"Sending top {len(candidates)} "
+            f"issues to LLM"
+        )
 
         print()
 
@@ -138,11 +206,23 @@ def main():
         # LLM analysis
         # -------------------------
 
-        for issue in relevant_issues:
+        for candidate in candidates:
+
+            issue = candidate["issue"]
 
             print(
                 f"Analyzing #{issue['number']}: "
                 f"{issue['title']}"
+            )
+
+            print(
+                f"Local relevance score: "
+                f"{candidate['relevance_score']}"
+            )
+
+            print(
+                f"Matched: "
+                f"{', '.join(candidate['matched_keywords'])}"
             )
 
             try:
@@ -154,7 +234,8 @@ def main():
                 )
 
                 print(
-                    f"Score: {result['score']}/100"
+                    f"AI Score: "
+                    f"{result['score']}/100"
                 )
 
                 print(
@@ -163,7 +244,8 @@ def main():
                 )
 
                 print(
-                    f"Reason: {result['reason']}"
+                    f"Reason: "
+                    f"{result['reason']}"
                 )
 
                 print(
@@ -177,7 +259,8 @@ def main():
                 )
 
                 print(
-                    f"URL: {issue['html_url']}"
+                    f"URL: "
+                    f"{issue['html_url']}"
                 )
 
             except Exception as e:
@@ -192,3 +275,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -22,100 +22,119 @@ class IssueAnalyzer:
 
     def analyze(self, issue, profile, previous_prs):
 
+        # Only send the information the model actually needs.
+        developer_context = {
+            "skills": profile.get("skills", []),
+            "areas_of_interest": profile.get(
+                "areas_of_interest", []
+            ),
+            "learning_goals": profile.get(
+                "learning_goals", []
+            )
+        }
+
+        # Only include useful information from previous PRs.
+        contribution_context = []
+
+        for pr in previous_prs[:10]:
+            contribution_context.append({
+                "title": pr.get("title", ""),
+                "body": pr.get("body", "") or "",
+                "labels": [
+                    label.get("name", "")
+                    for label in pr.get("labels", [])
+                ]
+            })
+
+        labels = [
+            label.get("name", "")
+            for label in issue.get("labels", [])
+        ]
+
         prompt = f"""
-You are IssueScout, an AI agent that helps
-developers discover GitHub issues they are
-well positioned to solve.
+You are IssueScout.
 
-Analyze whether the developer should consider
-working on this issue.
+Determine whether this GitHub issue is a good match
+for the developer.
 
-DEVELOPER PROFILE:
-{json.dumps(profile, indent=2)}
+DEVELOPER:
+{json.dumps(developer_context)}
 
-PREVIOUS PULL REQUESTS:
-{json.dumps(previous_prs, indent=2)}
+PREVIOUS CONTRIBUTIONS:
+{json.dumps(contribution_context)}
 
-GITHUB ISSUE:
-
-Repository:
-{issue.get("repository", "")}
-
-Title:
-{issue["title"]}
-
-Number:
-{issue["number"]}
-
-URL:
-{issue["html_url"]}
-
-Labels:
-{json.dumps(
-    [label["name"] for label in issue.get("labels", [])],
-    indent=2
-)}
-
-Description:
-{issue.get("body") or "No description provided"}
+ISSUE:
+Title: {issue.get("title", "")}
+Labels: {json.dumps(labels)}
+Description: {issue.get("body", "") or "No description"}
 
 Evaluate:
 
-1. Skill match
-2. Similarity to previous work
-3. Relevance to the developer's interests
-4. Difficulty
-5. Learning value
-6. Likelihood the developer could realistically contribute
+- skill match
+- previous experience match
+- interest match
+- difficulty
+- learning value
+- realistic contribution likelihood
 
 Be conservative.
-
-Do not invent technical details,
-file paths, or previous experience.
+Do not invent experience or technical details.
 
 Return ONLY valid JSON:
 
 {{
-    "score": 0,
-    "recommendation": "strongly_recommend",
-    "reason": "...",
-    "difficulty": "medium",
-    "learning_value": "high",
-    "relevant_experience": [],
-    "likely_components": [],
-    "suggested_first_steps": []
+  "score": 0,
+  "recommendation": "skip",
+  "reason": "",
+  "difficulty": "medium",
+  "learning_value": "medium",
+  "relevant_experience": [],
+  "likely_components": [],
+  "suggested_first_steps": []
 }}
 
-Score:
+Rules:
 
-90-100 = exceptional match
-80-89  = strong match
-70-79  = good match
-50-69  = possible match
-0-49   = poor match
+score:
+90-100 exceptional match
+80-89 strong match
+70-79 good match
+50-69 possible match
+0-49 poor match
 
-Recommendation must be one of:
+recommendation must be one of:
+strongly_recommend
+recommend
+maybe
+skip
 
-"strongly_recommend"
-"recommend"
-"maybe"
-"skip"
+difficulty must be one of:
+easy
+medium
+hard
+
+learning_value must be one of:
+low
+medium
+high
 """
 
         response = self.client.chat.completions.create(
             model=self.model,
+            extra_body={"think": False},
             messages=[
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            temperature=0
+            temperature=0,
+            max_tokens=400
         )
 
         text = response.choices[0].message.content.strip()
-
-        # Some models wrap JSON in markdown fences.
+ 
+        # Handle markdown JSON fences.
         if text.startswith("```"):
             text = text.split("\n", 1)[1]
             text = text.rsplit("```", 1)[0].strip()
